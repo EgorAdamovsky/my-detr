@@ -40,21 +40,88 @@ def crop(image: torch.Tensor, target: dict, region: tuple) -> tuple:
     return cropped_image, target
 
 
+# ГОРИЗОНТАЛЬНЫЙ ФЛИП
 def hflip(image: torch.Tensor, target: dict) -> tuple:
     flipped_image = torch.flip(image, [-1])  # Горизонтальный флип тензора
-
     w = image.shape[-1]
     target = target.copy()
-
     if "boxes" in target:
         boxes = target["boxes"].clone()
         boxes[:, [0, 2]] = w - boxes[:, [2, 0]]
         target["boxes"] = boxes
+    return flipped_image, target
 
-    if "masks" in target:
-        target['masks'] = torch.flip(target['masks'], [-1])
+
+# ВЕРТИКАЛЬНЫЙ ФЛИП
+def vflip(image: torch.Tensor, target: dict) -> tuple:
+    flipped_image = torch.flip(image, [-2])  # Вертикальный флип тензора
+    h = image.shape[-2]  # Высота изображения
+    target = target.copy()
+
+    if "boxes" in target:
+        boxes = target["boxes"].clone()
+        boxes[:, [1, 3]] = h - boxes[:, [3, 1]]  # y_min и y_max заменяются на h - y_max и h - y_min
+        target["boxes"] = boxes
 
     return flipped_image, target
+
+
+# ПОВОРОТ НА 90 / 180 / 270
+def rot90(image: torch.Tensor, target: dict) -> tuple:
+    # Определяем возможные углы поворота (1:90°, 2:180°, 3:270°)
+    k = random.choice([1, 2, 3])
+
+    # Получаем исходные размеры
+    _, orig_h, orig_w = image.shape
+
+    # Поворачиваем изображение
+    rotated_image = torch.rot90(image, k, dims=[1, 2])
+
+    # Обновляем размеры после поворота
+    new_h, new_w = rotated_image.shape[1:]
+    rotated_target = target.copy()
+
+    if "boxes" in rotated_target:
+        boxes = rotated_target["boxes"].clone()
+
+        # Применяем поворот к каждому боксу
+        for i in range(boxes.shape[0]):
+            x_min, y_min, x_max, y_max = boxes[i]
+            new_x_min, new_y_min, new_x_max, new_y_max = boxes[i]
+
+            if k == 1:  # 90° по часовой стрелке
+                new_x_min = y_min
+                new_y_min = orig_w - x_max
+                new_x_max = y_max
+                new_y_max = orig_w - x_min
+
+            elif k == 2:  # 180°
+                new_x_min = orig_w - x_max
+                new_y_min = orig_h - y_max
+                new_x_max = orig_w - x_min
+                new_y_max = orig_h - y_min
+
+            elif k == 3:  # 270° по часовой стрелке (90° против)
+                new_x_min = orig_h - y_max
+                new_y_min = x_min
+                new_x_max = orig_h - y_min
+                new_y_max = x_max
+
+            # Обновляем координаты с учетом новых размеров
+            boxes[i] = torch.tensor([
+                max(0, new_x_min),
+                max(0, new_y_min),
+                min(new_w, new_x_max),
+                min(new_h, new_y_max)
+            ])
+
+        rotated_target["boxes"] = boxes
+
+    # Обновляем размер изображения в target
+    if "size" in rotated_target:
+        rotated_target["size"] = torch.tensor([new_h, new_w])
+
+    return rotated_image, rotated_target
 
 
 def resize(image: torch.Tensor, target: dict, size: tuple, max_size: int = None) -> tuple:
@@ -165,6 +232,26 @@ class RandomHorizontalFlip(object):
     def __call__(self, img, target):
         if random.random() < self.p:
             return hflip(img, target)
+        return img, target
+
+
+class RandomVerticalFlip(object):
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, img, target):
+        if random.random() < self.p:
+            return vflip(img, target)
+        return img, target
+
+
+class Random90Rot(object):
+    def __init__(self, p=0.25):
+        self.p = p
+
+    def __call__(self, img, target):
+        if random.random() < self.p:
+            return rot90(img, target)
         return img, target
 
 

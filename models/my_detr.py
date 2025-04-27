@@ -98,8 +98,6 @@ class DETR(nn.Module):
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
 
         if random.randrange(20) == 0:
-            # print(out['pred_boxes'][0])
-            # print(out['pred_logits'][0])
             img = split_samples[0].tensors[0, :, :, :].permute(1, 2, 0).cpu().numpy()
             arr_min = img.min()
             arr_max = img.max()
@@ -115,13 +113,12 @@ class DETR(nn.Module):
                 y = int(wh[0] * float(out["pred_boxes"][0, i, 1].cpu().detach().numpy()))
                 w = int(wh[1] * float(out["pred_boxes"][0, i, 2].cpu().detach().numpy()))
                 h = int(wh[0] * float(out["pred_boxes"][0, i, 3].cpu().detach().numpy()))
-                no_smoke = out['pred_logits'][0][i][0]
-                smoke = out['pred_logits'][0][i][1]
-                color = (255, 0, 0) if smoke <= no_smoke else (0, 255, 0)
-                wth = 1 if smoke <= no_smoke else 2
-                if smoke > no_smoke:
+                max_index = torch.argmax(out['pred_logits'][0][i])
+                color = (255, 0, 0) if max_index == 1 else (0, 255, 0)
+                wth = 2 if max_index == 1 else 1
+                if max_index == 1:
                     counter = counter + 1
-                img = cv2.rectangle(img, (int(x), int(y)), (int(w), int(h)), color, wth)
+                img = cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(w + w / 2), int(h + h / 2)), color, wth)
             unix_time_int = int(time.time())
             plt.imsave('my/video-out-2/images/' + str(counter) + '__' + str(unix_time_int) + '.png', img, format='png')
 
@@ -326,7 +323,7 @@ class MLP(nn.Module):
 
 
 def build(args):
-    num_classes = 1  # в теории он 1 (дым), но надо подавать на 1 больше
+    num_classes = 9  # в теории он 1 (дым), но надо подавать на 1 больше
     device = torch.device(args.device)
     backbone = build_backbone(args)
     transformer = build_transformer(args)

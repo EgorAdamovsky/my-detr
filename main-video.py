@@ -24,6 +24,11 @@ def get_args_parser():
     # Создание парсера аргументов командной строки
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
 
+    ## ЭКСПЕРИМЕНТ #####################################################################################################
+    parser.add_argument('--prevs', default=2, type=int, help='Количество предыдущих кадров')
+    parser.add_argument('--show', default=1, type=int, help='Генерировать ли отладочные картинки')
+    ## ЭКСПЕРИМЕНТ #####################################################################################################
+
     # Параметры оптимизатора
     parser.add_argument('--lr', default=1e-4, type=float, help='Скорость обучения')
     parser.add_argument('--lr_backbone', default=1e-5, type=float, help='Скорость обучения для backbone')
