@@ -1,0 +1,3 @@
+@echo off
+
+python "D:\Disser\Programs\OTHER-MODELS\detr\eval_image.py" --coco_path "D:\Disser\Programs\OTHER-MODELS\detr\my\LSD-4" --enc_layers 2 --dec_layers 2 --dim_feedforward 1024 --epochs 500 --output_dir "D:\Disser\Programs\OTHER-MODELS\detr\my\out-1" --batch_size 2 --hidden_dim 128 --nheads 2 --num_queries 25 --resume "D:\Disser\Programs\OTHER-MODELS\detr\my\out-1\checkpoint.pth" --img "D:\Disser\Programs\OTHER-MODELS\detr\my\LSD-4\train2017\000003_jpg.rf.ab76ecb184edebcecedf8feb6ed643bb.jpg" --eval

@@ -1,0 +1,1 @@
+python "main-video.py" --coco_path "D:\Disser\Datasets\Gfo-fire-and-smoke-2" --epochs 500 --lr_drop 50 --enc_layers 2 --dec_layers 6 --nheads 8 --hidden_dim 128 --num_queries 50 --dim_feedforward 512 --no_aux_loss --batch_size 2 --output_dir "D:\Disser\Programs\OTHER-MODELS\detr\my\3d-out-3" --resume "D:\Disser\Programs\OTHER-MODELS\detr\my\3d-out-3\checkpoint.pth"
