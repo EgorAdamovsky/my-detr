@@ -5,7 +5,9 @@ import torch
 import torchvision.transforms.functional as F
 from torchvision.transforms.functional import InterpolationMode
 from util.box_ops import box_xyxy_to_cxcywh
+from torchvision.transforms.functional import adjust_brightness, adjust_contrast
 from util.misc import interpolate
+from typing import Tuple
 
 
 def crop(image: torch.Tensor, target: dict, region: tuple) -> tuple:
@@ -66,64 +68,6 @@ def vflip(image: torch.Tensor, target: dict) -> tuple:
     return flipped_image, target
 
 
-# ПОВОРОТ НА 90 / 180 / 270
-def rot90(image: torch.Tensor, target: dict) -> tuple:
-    # Определяем возможные углы поворота (1:90°, 2:180°, 3:270°)
-    k = random.choice([1, 2, 3])
-
-    # Получаем исходные размеры
-    _, orig_h, orig_w = image.shape
-
-    # Поворачиваем изображение
-    rotated_image = torch.rot90(image, k, dims=[1, 2])
-
-    # Обновляем размеры после поворота
-    new_h, new_w = rotated_image.shape[1:]
-    rotated_target = target.copy()
-
-    if "boxes" in rotated_target:
-        boxes = rotated_target["boxes"].clone()
-
-        # Применяем поворот к каждому боксу
-        for i in range(boxes.shape[0]):
-            x_min, y_min, x_max, y_max = boxes[i]
-            new_x_min, new_y_min, new_x_max, new_y_max = boxes[i]
-
-            if k == 1:  # 90° по часовой стрелке
-                new_x_min = y_min
-                new_y_min = orig_w - x_max
-                new_x_max = y_max
-                new_y_max = orig_w - x_min
-
-            elif k == 2:  # 180°
-                new_x_min = orig_w - x_max
-                new_y_min = orig_h - y_max
-                new_x_max = orig_w - x_min
-                new_y_max = orig_h - y_min
-
-            elif k == 3:  # 270° по часовой стрелке (90° против)
-                new_x_min = orig_h - y_max
-                new_y_min = x_min
-                new_x_max = orig_h - y_min
-                new_y_max = x_max
-
-            # Обновляем координаты с учетом новых размеров
-            boxes[i] = torch.tensor([
-                max(0, new_x_min),
-                max(0, new_y_min),
-                min(new_w, new_x_max),
-                min(new_h, new_y_max)
-            ])
-
-        rotated_target["boxes"] = boxes
-
-    # Обновляем размер изображения в target
-    if "size" in rotated_target:
-        rotated_target["size"] = torch.tensor([new_h, new_w])
-
-    return rotated_image, rotated_target
-
-
 def resize(image: torch.Tensor, target: dict, size: tuple, max_size: int = None) -> tuple:
     original_size = image.shape[-2:]  # Получаем [H, W] из тензора
     h, w = original_size
@@ -173,6 +117,175 @@ def pad(image: torch.Tensor, target: dict, padding: tuple) -> tuple:
         target['masks'] = F.pad(target['masks'], [pad_left, pad_top, pad_right, pad_bottom])
 
     return padded_image, target
+
+
+class RandomBrightnessContrast(object):
+    def __init__(self,
+                 brightness_range: Tuple[float, float] = (0.8, 1.2),
+                 contrast_range: Tuple[float, float] = (0.8, 1.2),
+                 p: float = 0.5,
+                 pixel_range: Tuple[float, float] = (0.0, 255.0)):
+        self.brightness_range = brightness_range
+        self.contrast_range = contrast_range
+        self.p = p
+        self.pixel_min, self.pixel_max = pixel_range
+
+    def __call__(self, image: torch.Tensor, target: dict) -> Tuple[torch.Tensor, dict]:
+        if random.random() >= self.p:
+            return image, target
+
+        # Применяем преобразования
+        if random.random() > 0.5:
+            image = self.adjust_brightness(image, self.get_factor(*self.brightness_range))
+            image = self.adjust_contrast(image, self.get_factor(*self.contrast_range))
+        else:
+            image = self.adjust_contrast(image, self.get_factor(*self.contrast_range))
+            image = self.adjust_brightness(image, self.get_factor(*self.brightness_range))
+
+        # Клиппинг значений
+        image = torch.clamp(image, self.pixel_min, self.pixel_max)
+        return image, target
+
+    @staticmethod
+    def get_factor(min_val: float, max_val: float) -> float:
+        return random.uniform(min_val, max_val)
+
+    @staticmethod
+    def adjust_brightness(image: torch.Tensor, factor: float) -> torch.Tensor:
+        """Регулировка яркости для любого числа каналов"""
+        delta = (factor - 1) * (image.max() - image.min())
+        return image + delta
+
+    @staticmethod
+    def adjust_contrast(image: torch.Tensor, factor: float) -> torch.Tensor:
+        """Регулировка контраста для любого числа каналов"""
+        mean = image.mean(dim=(-2, -1), keepdim=True)
+        return (image - mean) * factor + mean
+
+
+class RandomShift(object):
+
+    def __init__(self, shift_x_range=(-0.1, 0.1), shift_y_range=(-0.1, 0.1), fill=0):
+        """
+        Args:
+            shift_x_range (tuple): Диапазон сдвига по оси X в долях от ширины (например, (-0.1, 0.1) для ±10%)
+            shift_y_range (tuple): Диапазон сдвига по оси Y в долях от высоты
+            fill (int): Значение для заполнения новых пикселей (по умолчанию 0)
+        """
+        self.shift_x_range = shift_x_range
+        self.shift_y_range = shift_y_range
+        self.fill = fill
+
+    def __call__(self, image: torch.Tensor, target: dict) -> tuple:
+        _, h, w = image.shape
+
+        # Генерация сдвига в пикселях
+        dx = int(random.uniform(*self.shift_x_range) * w)
+        dy = int(random.uniform(*self.shift_y_range) * h)
+
+        # Применение аффинного сдвига к изображению
+        shifted_image = F.affine(image, angle=0, translate=(dx, dy), scale=1.0, shear=0, fill=self.fill)
+
+        if target is not None:
+            target = target.copy()
+
+            # Обработка bounding boxes
+            if "boxes" in target:
+                boxes = target["boxes"].clone()
+                boxes[:, [0, 2]] += dx  # Сдвиг X-координат
+                boxes[:, [1, 3]] += dy  # Сдвиг Y-координат
+
+                # Обрезка боксов до границ изображения
+                boxes[:, 0::2] = boxes[:, 0::2].clamp(min=0, max=w)
+                boxes[:, 1::2] = boxes[:, 1::2].clamp(min=0, max=h)
+
+                # Убедимся, что x_max >= x_min и y_max >= y_min
+                boxes[:, 2] = torch.max(boxes[:, 0], boxes[:, 2])
+                boxes[:, 3] = torch.max(boxes[:, 1], boxes[:, 3])
+
+                # Вычисление площади и фильтрация боксов с нулевой площадью
+                area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+                keep = area > 1e-6  # Минимальная площадь для сохранения бокса
+
+                # Обновление target
+                target["boxes"] = boxes[keep]
+                target["area"] = area[keep]
+
+                # Фильтрация других полей (labels, iscrowd)
+                for field in ["labels", "iscrowd"]:
+                    if field in target:
+                        target[field] = target[field][keep]
+
+            # Обработка масок
+            if "masks" in target:
+                masks = target["masks"].float()
+                shifted_masks = F.affine(masks, angle=0, translate=(dx, dy), scale=1.0, shear=0, fill=0)
+                target["masks"] = shifted_masks.bool()
+
+                # Фильтрация масок в соответствии с боксами
+                if "boxes" in target:
+                    target["masks"] = target["masks"][keep]
+
+        return shifted_image, target
+
+
+class RandomRotate180(object):
+
+    def __init__(self, p=0.125):
+        self.p = p
+
+    def __call__(self, img: torch.Tensor, target: dict) -> tuple:
+        if random.random() >= self.p:
+            return img, target
+
+        # Получаем размеры изображения
+        _, h, w = img.shape
+
+        # Поворачиваем изображение на 180 градусов
+        rotated_img = F.rotate(img, 180, interpolation=InterpolationMode.BILINEAR)
+
+        if target is not None:
+            target = target.copy()
+
+            # Обработка bounding boxes
+            if "boxes" in target:
+                boxes = target["boxes"].clone()
+
+                # Преобразование координат при повороте на 180 градусов
+                boxes[:, [0, 2]] = w - boxes[:, [2, 0]]  # x_min и x_max
+                boxes[:, [1, 3]] = h - boxes[:, [3, 1]]  # y_min и y_max
+
+                # Проверка корректности координат
+                boxes[:, 0::2] = boxes[:, 0::2].clamp(min=0, max=w)
+                boxes[:, 1::2] = boxes[:, 1::2].clamp(min=0, max=h)
+
+                # Убедимся, что x_max >= x_min и y_max >= y_min
+                boxes[:, 2] = torch.max(boxes[:, 0], boxes[:, 2])
+                boxes[:, 3] = torch.max(boxes[:, 1], boxes[:, 3])
+
+                # Вычисление новой площади
+                area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+                keep = area > 1e-6  # Фильтрация боксов с нулевой площадью
+
+                # Обновление target
+                target["boxes"] = boxes[keep]
+                target["area"] = area[keep]
+
+                # Фильтрация других полей
+                for field in ["labels", "iscrowd"]:
+                    if field in target:
+                        target[field] = target[field][keep]
+
+            # Обработка масок
+            if "masks" in target:
+                rotated_masks = F.rotate(target["masks"].float(), 180, interpolation=InterpolationMode.NEAREST)
+                target["masks"] = rotated_masks.bool()
+
+                # Синхронизация масок с боксами
+                if "boxes" in target:
+                    target["masks"] = target["masks"][keep]
+
+        return rotated_img, target
 
 
 # В классе RandomSizeCrop:
@@ -242,16 +355,6 @@ class RandomVerticalFlip(object):
     def __call__(self, img, target):
         if random.random() < self.p:
             return vflip(img, target)
-        return img, target
-
-
-class Random90Rot(object):
-    def __init__(self, p=0.25):
-        self.p = p
-
-    def __call__(self, img, target):
-        if random.random() < self.p:
-            return rot90(img, target)
         return img, target
 
 

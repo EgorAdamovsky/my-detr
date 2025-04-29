@@ -17,7 +17,7 @@ from matplotlib import pyplot as plt  # Модуль для построения
 import warnings  # Игнорим предупреждения
 
 warnings.filterwarnings("ignore")  # Игнорим предупреждения
-matplotlib.use('TkAgg')  # Установка бэкенда для отображения графиков
+# matplotlib.use('TkAgg')  # Установка бэкенда для отображения графиков
 
 
 def get_args_parser():

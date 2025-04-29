@@ -27,6 +27,12 @@ def plot_training_progress(log_data):
     train_class_error = [log["train_class_error"] for log in log_data]
     test_class_error = [log["test_class_error"] for log in log_data]
 
+    train_box_error = [log["train_loss_bbox"] for log in log_data]
+    test_box_error = [log["test_loss_bbox"] for log in log_data]
+
+    train_giou_error = [log["train_loss_giou"] for log in log_data]
+    test_giou_error = [log["test_loss_giou"] for log in log_data]
+
     train_lr = [log["train_lr"] for log in log_data]
 
     coco_eval_bbox = [log["test_coco_eval_bbox"] for log in log_data]
@@ -35,8 +41,18 @@ def plot_training_progress(log_data):
     fig, axes = plt.subplots(3, 1, figsize=(10, 18))
 
     # График потерь (loss)
-    axes[0].plot(epochs, train_loss, label="Train Loss", marker='.')
-    axes[0].plot(epochs, test_loss, label="Test Loss", marker='.')
+    g, = axes[0].plot(epochs, train_loss, label="Train Loss", marker='.')
+    g.set_color("black")
+    g, = axes[0].plot(epochs, train_box_error, label=" Train Box Loss", marker=',')
+    g.set_color("black")
+    g, = axes[0].plot(epochs, train_giou_error, label=" Train GIOU Loss", marker='+')
+    g.set_color("black")
+    g, = axes[0].plot(epochs, test_loss, label="Test Loss", marker='.')
+    g.set_color("red")
+    g, = axes[0].plot(epochs, test_box_error, label=" Test Box Loss", marker=',')
+    g.set_color("red")
+    g, = axes[0].plot(epochs, test_giou_error, label=" Test GIOU Loss", marker='+')
+    g.set_color("red")
     axes[0].set_title("Loss over Epochs")
     axes[0].set_xlabel("Epoch")
     axes[0].set_ylabel("Loss")
@@ -62,12 +78,15 @@ def plot_training_progress(log_data):
 
     # Дополнительный график для COCOEval BBox (если нужно)
 
-    COCOEvalBBox = ["AP (Average Precision)", "AP@IoU=0.50", "AP@IoU=0.75", "AP (small)", "AP (medium)", "AP (large)", "AR (Average Recall)"]
+    COCOEvalBBox = ["AP 0.50:0.95", "AP 0.50", "AP 0.75", "AP 0.50:0.95, area=small", "AP 0.50:0.95, area=medium",
+                    "AP 0.50:0.95, area=large", "AR 0.50:0.95, maxDets=1", "AR 0.50:0.95, maxDets=10",
+                    "AR 0.50:0.95, maxDets=100", "AR 0.50:0.95, area=small",
+                    "AR 0.50:0.95, area=medium", "AR 0.50:0.95, area=large"]
     if coco_eval_bbox:
         fig_coco, ax_coco = plt.subplots(figsize=(10, 6))
         for i, metric in enumerate(coco_eval_bbox[0]):
             metric_values = [bbox[i] for bbox in coco_eval_bbox]
-            ax_coco.plot(epochs, metric_values, label=f"COCO BBox Metric {i}", marker='.')
+            ax_coco.plot(epochs, metric_values, label=f"COCO BBox Metric {COCOEvalBBox[i]}", marker='.')
 
         ax_coco.set_title("COCOEval BBox Metrics over Epochs")
         ax_coco.set_xlabel("Epoch")
@@ -83,7 +102,7 @@ def plot_training_progress(log_data):
 # Пример использования
 if __name__ == "__main__":
     # Логи в виде строки (замените на путь к файлу, если логи находятся в файле)
-    with open(r"D:\Disser\Programs\OTHER-MODELS\detr\my\video-out\log.txt", "r") as file:
+    with open(r"D:\Disser\Programs\OTHER-MODELS\my-detr\my\out\log.txt", "r") as file:
         logs = file.read()
 
     # Читаем логи

@@ -1,3 +1,4 @@
+import time
 from pathlib import Path  # Импорт модуля для работы с путями файловой системы
 
 import cv2
@@ -27,7 +28,11 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         ## ЭКСПЕРИМЕНТ #################################################################################################
         img, target = super(CocoDetection, self).__getitem__(idx)  # Получение изображения и аннотаций
         image_id = self.ids[idx]  # Получение номера изображения
-        list_imgs = self.coco.imgs[idx]['prev_imgs']  # список предыдущих кадров
+        list_imgs = []
+        try:
+            list_imgs = self.coco.imgs[idx]['prev_imgs']  # список предыдущих кадров
+        except KeyError:
+            pass
         prevs = pil_to_tensor(img).type('torch.FloatTensor')  # начало формирования тензора из кадров
         if len(list_imgs) < self.args.prevs:  # если предыдущих кадров не хватает
             for i in range(self.args.prevs):  # значит просто задублировать текущий кадр
@@ -59,22 +64,26 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         if self._transforms is not None:  # Применение дополнительных преобразований
             prevs, target = self._transforms(prevs, target)
             if self.args.show == 1:
-                split_prevs = torch.tensor_split(prevs, 3, dim=0)
-                for i in range(self.args.prevs + 1):
-                    _img = split_prevs[i].permute(1, 2, 0).cpu().numpy()
-                    arr_min = _img.min()
-                    arr_max = _img.max()
-                    _img = (_img - arr_min) / (arr_max - arr_min)
-                    _img = (_img * 255).astype(np.uint8)
-                    x = int(target["size"][1].numpy().item() * target["boxes"][0][0].numpy().item())
-                    y = int(target["size"][0].numpy().item() * target["boxes"][0][1].numpy().item())
-                    w = int(target["size"][1].numpy().item() * target["boxes"][0][2].numpy().item())
-                    h = int(target["size"][0].numpy().item() * target["boxes"][0][3].numpy().item())
-                    _img = cv2.cvtColor(_img, cv2.COLOR_RGB2BGR)
-                    _img = cv2.cvtColor(_img, cv2.COLOR_BGR2RGB)
-                    _img = cv2.rectangle(_img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)),
-                                         (255, 255, 0), 2)
-                    plt.imsave('my/temps/' + str(i) + '_trans.png', _img, format='png')
+                try:
+                    split_prevs = torch.tensor_split(prevs, self.args.prevs + 1, dim=0)
+                    for i in range(self.args.prevs + 1):
+                        _img = split_prevs[i].permute(1, 2, 0).cpu().numpy()
+                        arr_min = _img.min()
+                        arr_max = _img.max()
+                        _img = (_img - arr_min) / (arr_max - arr_min)
+                        _img = (_img * 255).astype(np.uint8)
+                        x = int(target["size"][1].numpy().item() * target["boxes"][0][0].numpy().item())
+                        y = int(target["size"][0].numpy().item() * target["boxes"][0][1].numpy().item())
+                        w = int(target["size"][1].numpy().item() * target["boxes"][0][2].numpy().item())
+                        h = int(target["size"][0].numpy().item() * target["boxes"][0][3].numpy().item())
+                        _img = cv2.cvtColor(_img, cv2.COLOR_RGB2BGR)
+                        _img = cv2.cvtColor(_img, cv2.COLOR_BGR2RGB)
+                        _img = cv2.rectangle(_img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)),
+                                             (255, 255, 0), 2)
+                        unix_time_int = int(time.time())
+                        plt.imsave('my/images/' + str(i) + "_trans_" + str(unix_time_int) + '.png', _img, format='png')
+                except IndexError:
+                    pass
 
         return prevs, target
     ## ЭКСПЕРИМЕНТ #################################################################################################
@@ -113,28 +122,33 @@ class ConvertCocoPolysToMask(object):
 
 
 # Функция создания преобразований для датасета
-def make_coco_transforms(image_set):
+def make_coco_transforms(image_set, rep):
+    n1 = rep * [0.485, 0.456, 0.406]
+    n2 = rep * [0.229, 0.224, 0.225]
     # Нормализация с параметрами ImageNet
-    normalize = T.Compose([T.ToTensor(),
-                           T.Normalize(  # тут именно для 3 кадров подряд, потом перепишу
-                               [0.485, 0.456, 0.406, 0.485, 0.456, 0.406, 0.485, 0.456, 0.406],
-                               [0.229, 0.224, 0.225, 0.229, 0.224, 0.225, 0.229, 0.224, 0.225])])
+    normalize = T.Compose([T.ToTensor(), T.Normalize(n1, n2)])
     # Множество масштабов для ресайза
     scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
 
     if image_set == 'train':
         return T.Compose([
-            T.RandomHorizontalFlip(),  # Горизонтальный флип с вероятностью 0.5
-            T.RandomVerticalFlip(),  # вертикальный флип с вероятностью 0.5
-            # T.Random90Rot(),  # поворот прямой с вероятностью 0.25
-            T.RandomSelect(  # Выбор между простым ресайзом и ресайзом с кропом
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 600]),
-                    T.RandomSizeCrop(384, 600),
+            T.Compose([
+                T.RandomHorizontalFlip(),  # Горизонтальный флип
+                # T.RandomVerticalFlip(),  # вертикальный флип
+                # T.RandomRotate180(),
+                T.RandomShift(shift_x_range=(-0.2, 0.2), shift_y_range=(-0.2, 0.2), fill=0),
+                T.RandomSelect(  # Выбор между простым ресайзом и ресайзом с кропом
                     T.RandomResize(scales, max_size=1333),
-                ])
-            ),
+                    T.Compose([
+                        T.RandomResize([400, 500, 600]),
+                        T.RandomSizeCrop(384, 600),
+                        T.RandomResize(scales, max_size=1333),
+                    ])
+                ),
+            ]),
+            T.RandomHorizontalFlip(),  # Горизонтальный флип
+            # T.RandomVerticalFlip(),  # вертикальный флип
+            T.RandomBrightnessContrast(),
             normalize,
         ])
 
@@ -157,6 +171,6 @@ def build(image_set, args):
         "val": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
     }  # Определение путей для трейна и валидации
     img_folder, ann_file = PATHS[image_set]  # Получение путей для текущего набора данных
-    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set), return_masks=False,
+    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set, args.prevs + 1), return_masks=False,
                             args=args)
     return dataset

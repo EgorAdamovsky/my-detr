@@ -177,12 +177,17 @@ merge_coco_datasets(
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-28",
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-29",
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-30",
-    # r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-31",
-    # # r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-32",
-    # r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-33",
-    # r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-34",
-    # r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-35",
-    max_prev_imgs=10
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-31",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-32",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-33",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-34",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-35",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-36",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-37",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-38",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-39",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-40",
+    max_prev_imgs=5
 )
 
 merge_coco_datasets(
@@ -197,7 +202,8 @@ merge_coco_datasets(
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-6",
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-7",
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-8",
-    max_prev_imgs=10
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-9",
+    max_prev_imgs=5
 )
 
 # merge_coco_datasets(

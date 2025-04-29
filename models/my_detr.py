@@ -16,13 +16,13 @@ from .transformer import build_transformer
 import matplotlib
 from matplotlib import pyplot as plt
 from PIL import Image
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 
 # НАША ОСНОВНАЯ МОДЕЛЬ
 class DETR(nn.Module):
 
-    def __init__(self, backbone, transformer, num_classes, num_queries):
+    def __init__(self, backbone, transformer, num_classes, num_queries, args):
         super().__init__()
         self.num_queries = num_queries  # количество запросов
         self.transformer = transformer  # трансформер
@@ -30,14 +30,11 @@ class DETR(nn.Module):
         self.class_embed = nn.Linear(hidden_dim, num_classes + 1)  # линейный слой для предсказания классов
         self.bbox_embed = MLP(hidden_dim, hidden_dim, 4, 3)  # полносвязная сеть для предсказания боксов
         self.query_embed = nn.Embedding(num_queries, hidden_dim)  # эмбеддинги запросов
-
-        ## ОРИГИНАЛ 2 ##################################################################################################
-        # backbone_num_channels = int(backbone.num_channels)
-        ################################################################################################################
+        self.args = args
 
         ## ЭКСПЕРИМЕНТ 2 ###############################################################################################
-        ## увеличивается глубина в 8 раз
-        backbone_num_channels = int(backbone.num_channels * 3)
+        ## увеличивается глубина
+        backbone_num_channels = int(backbone.num_channels * (args.prevs + 1))
         ################################################################################################################
 
         backbone_hidden_dim = int(hidden_dim)
@@ -48,38 +45,19 @@ class DETR(nn.Module):
     # ПРОГОН ДАННЫХ
     def forward(self, samples: NestedTensor):
 
-        ## ОРИГИНАЛ 1 ##################################################################################################
-        # if isinstance(samples, (list, torch.Tensor)):
-        #     samples = nested_tensor_from_tensor_list(samples)  # тензор -> NestedTensor
-        # features, pos = self.backbone(samples)  # карты признаков разных уровней от 1 до N
-        # src, mask = features[-1].decompose()  # разделяет последнюю карту признаков на саму карту и маску отступов
-        # src_prepared = src
-        # pos_prepared = pos[-1]
-        # assert mask is not None
-        ################################################################################################################
-
-        pass
-
         ## ЭКСПЕРИМЕНТ 1 ###############################################################################################
         ## имитирую 8 кадров, которые проходят через backbone по очереди
         ## конкатенирую их в один большой тензор
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)  # тензор -> NestedTensor
-        split_tensors = torch.tensor_split(samples.tensors, 3, dim=1)
+        split_tensors = torch.tensor_split(samples.tensors, (self.args.prevs + 1), dim=1)
         split_samples = []
         for i in range(len(split_tensors)):
             split_samples.append(NestedTensor(split_tensors[i], samples.mask))
         src_prepared = None
         pos_prepared = None
         mask = None
-
-        # img = samples.tensors[0].permute(1, 2, 0).cpu().numpy()
-        # arr_min = img.min()
-        # arr_max = img.max()
-        # img = (img - arr_min) / (arr_max - arr_min)
-        # plt.imsave('D:/output.png', img, format='png')
-
-        for i in range(3):
+        for i in range((self.args.prevs + 1)):
             features, pos = self.backbone(split_samples[i])  # карты признаков разных уровней от 1 до N
             src, mask = features[-1].decompose()  # разделяет последнюю карту признаков на саму карту и маску отступов
             if src_prepared is None:
@@ -97,7 +75,8 @@ class DETR(nn.Module):
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
 
-        if random.randrange(20) == 0:
+        # if True:
+        if random.randrange(30) == 0:
             img = split_samples[0].tensors[0, :, :, :].permute(1, 2, 0).cpu().numpy()
             arr_min = img.min()
             arr_max = img.max()
@@ -114,13 +93,17 @@ class DETR(nn.Module):
                 w = int(wh[1] * float(out["pred_boxes"][0, i, 2].cpu().detach().numpy()))
                 h = int(wh[0] * float(out["pred_boxes"][0, i, 3].cpu().detach().numpy()))
                 max_index = torch.argmax(out['pred_logits'][0][i])
-                color = (255, 0, 0) if max_index == 1 else (0, 255, 0)
+                color = (128, 128, 128)
+                if max_index == 1:
+                    color = (255, 0, 0)
+                if max_index == len(out['pred_logits'][0][i]) - 1:
+                    color = (0, 255, 0)
                 wth = 2 if max_index == 1 else 1
                 if max_index == 1:
                     counter = counter + 1
-                img = cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(w + w / 2), int(h + h / 2)), color, wth)
+                img = cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), color, wth)
             unix_time_int = int(time.time())
-            plt.imsave('my/video-out-2/images/' + str(counter) + '__' + str(unix_time_int) + '.png', img, format='png')
+            plt.imsave('my/images/' + str(counter) + '_' + str(unix_time_int) + '.png', img, format='png')
 
         return out
 
@@ -323,11 +306,11 @@ class MLP(nn.Module):
 
 
 def build(args):
-    num_classes = 9  # в теории он 1 (дым), но надо подавать на 1 больше
+    num_classes = 2  # в теории он 1 (дым), но надо подавать на 1 больше
     device = torch.device(args.device)
     backbone = build_backbone(args)
     transformer = build_transformer(args)
-    model = DETR(backbone, transformer, num_classes=num_classes, num_queries=args.num_queries)
+    model = DETR(backbone, transformer, num_classes=num_classes, num_queries=args.num_queries, args=args)
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef, 'loss_giou': args.giou_loss_coef}
     losses = ['labels', 'boxes', 'cardinality']
