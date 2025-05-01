@@ -1,3 +1,7 @@
+"""
+СБОРКА ДАТАСЕТА ПО КУСКАМ
+"""
+
 import json
 import os
 import shutil
@@ -21,19 +25,8 @@ def copy_folder_contents(source_path, destination_path):
                 print(f"Предупреждение: Файл {item} уже существует в целевой директории")
 
 
-def merge_coco_datasets(ds_type: str,
-                        output_path: str,
-                        *dataset_paths: str,
-                        max_prev_imgs: int = 10):
-    """
-    Объединяет произвольное количество COCO-датасетов
+def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max_prev_imgs: int = 10):
 
-    Args:
-        ds_type: Тип датасета ('train' или 'val')
-        output_path: Путь для сохранения результата
-        dataset_paths: Переменное количество путей к исходным датасетам
-        max_prev_imgs: Максимальное количество элементов в prev_imgs
-    """
     merged = {
         'info': {},
         'licenses': [],
@@ -47,7 +40,7 @@ def merge_coco_datasets(ds_type: str,
     image_id_map = {}
     ann_id_map = {}
     existing_files = set()
-    next_cat_id = 0
+    next_cat_id = 1
     next_image_id = 0
     next_ann_id = 0
 
@@ -139,72 +132,112 @@ def merge_coco_datasets(ds_type: str,
     with open(output_dir / f"instances_{ds_type}2017.json", 'w') as f:
         json.dump(merged, f, indent=2, ensure_ascii=False)
 
+    replace_in_file(output_dir / f"instances_{ds_type}2017.json", '"category_id": 0', '"category_id": 1')
+
     print(f"Слияние завершено! Результат сохранен в {output_path}")
 
 
-# Пример использования:
+def replace_in_file(file_path, old_substring, new_substring):
+    """
+    Заменяет все вхождения подстроки в указанном файле.
+
+    :param file_path: Путь к файлу
+    :param old_substring: Подстрока, которую нужно заменить
+    :param new_substring: Подстрока, на которую нужно заменить
+    """
+    try:
+        # Чтение файла
+        with open(file_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        # Замена подстроки
+        updated_content = content.replace(old_substring, new_substring)
+
+        # Перезапись файла
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(updated_content)
+
+        print(f"[OK] Замена выполнена в файле: {file_path}")
+
+    except FileNotFoundError:
+        print(f"[Ошибка] Файл не найден: {file_path}")
+    except Exception as e:
+        print(f"[Ошибка] При обработке файла: {e}")
+
+
 merge_coco_datasets(
     "train",
     r"D:\Disser\Datasets\TEST-DATASET",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-0",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-1",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-2",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-3",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-4",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-5",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-6",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-7",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-8",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-9",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-10",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-11",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-12",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-13",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-14",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-15",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-16",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-17",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-18",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-19",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-20",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-21",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-22",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-23",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-24",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-25",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-26",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-27",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-28",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-29",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-30",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-31",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-32",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-33",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-34",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-35",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-36",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-37",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-38",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-39",
     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-40",
+    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-41",
     max_prev_imgs=5
 )
+# merge_coco_datasets(
+#     "train",
+#     r"D:\Disser\Datasets\TEST-DATASET",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-0",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-1",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-2",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-3",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-4",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-5",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-6",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-7",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-8",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-9",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-10",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-11",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-12",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-13",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-14",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-15",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-16",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-17",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-18",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-19",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-20",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-21",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-22",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-23",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-24",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-25",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-26",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-27",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-28",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-29",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-30",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-31",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-32",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-33",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-34",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-35",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-36",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-37",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-38",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-39",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-40",
+#     max_prev_imgs=5
+# )
 
-merge_coco_datasets(
-    "val",
-    r"D:\Disser\Datasets\TEST-DATASET",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-0",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-1",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-2",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-3",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-4",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-5",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-6",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-7",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-8",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-9",
-    max_prev_imgs=5
-)
+pass
+
+# merge_coco_datasets(
+#     "val",
+#     r"D:\Disser\Datasets\TEST-DATASET",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-0",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-1",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-2",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-3",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-4",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-5",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-6",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-7",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-8",
+#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-9",
+#     max_prev_imgs=5
+# )
+
+pass
 
 # merge_coco_datasets(
 #     "val",
@@ -216,4 +249,4 @@ merge_coco_datasets(
 #     max_prev_imgs=10
 # )
 
-print("Слияние завершено!")
+print("[Успех]")

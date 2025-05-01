@@ -1,31 +1,36 @@
+"""
+ПРОВЕРКА КОРРЕКТНОСТИ ДАТАСЕТА
+"""
+
 import os
+import shutil
+
 import cv2
 import numpy as np
 from pycocotools.coco import COCO
 
-# Конфигурация путей
-PATH = r"D:/Disser/Datasets/TEST-DATASET/"
+PATH = r"D:\Disser\Datasets\TEST-DATASET"
+# PATH = r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-41"
+
 DATASET_CONFIG = {
     "train": {
-        "annotations": PATH + r"annotations/instances_train2017.json",
-        "images": PATH + r"train2017",
-        "output": PATH + r"visualizations/train2017"
+        "annotations": PATH + r"/annotations/instances_train2017.json",
+        "images": PATH + r"/train2017",
+        "output": PATH + r"/visualizations/train2017"
     },
     "val": {
-        "annotations": PATH + r"annotations/instances_val2017.json",
-        "images": PATH + r"val2017",
-        "output": PATH + r"visualizations/val2017"
+        "annotations": PATH + r"/annotations/instances_val2017.json",
+        "images": PATH + r"/val2017",
+        "output": PATH + r"/visualizations/val2017"
     }
 }
-
-# Цвета для классов (RGB)
-COLORS = [
-    (0, 255, 0), (255, 0, 0), (0, 0, 255), (255, 255, 0),
-    (255, 0, 255), (0, 255, 255), (128, 0, 0), (0, 128, 0)
-]
+COLORS = [(0, 255, 0), (0, 0, 255), (255, 0, 0)]
 
 
 def visualize_annotations(data_type):
+    if os.path.exists(PATH + r'\visualization'):
+        shutil.rmtree(PATH + r'\visualization')
+
     config = DATASET_CONFIG[data_type]
 
     # Проверка наличия файлов
@@ -91,4 +96,5 @@ if __name__ == "__main__":
     for data_type in DATASET_CONFIG:
         print(f"\n[Обработка] Начата визуализация для: {data_type.upper()}")
         visualize_annotations(data_type)
-    print("[Успех]")
+
+print("\n[Успех]")
