@@ -10,7 +10,8 @@ import numpy as np
 from pycocotools.coco import COCO
 
 PATH = r"D:\Disser\Datasets\TEST-DATASET"
-# PATH = r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-41"
+# PATH = r"D:\Disser\Datasets\temps\dataset-train-9"
+# PATH = r"D:\Disser\Datasets\temps\dataset-val-2"
 
 DATASET_CONFIG = {
     "train": {

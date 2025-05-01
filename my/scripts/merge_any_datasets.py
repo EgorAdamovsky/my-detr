@@ -25,7 +25,17 @@ def copy_folder_contents(source_path, destination_path):
                 print(f"Предупреждение: Файл {item} уже существует в целевой директории")
 
 
-def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max_prev_imgs: int = 10):
+def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
+                        annotation_step: int = 1, max_prev_imgs: int = 10):
+    """
+    Сливает несколько COCO-датасетов в один, выбирая аннотации с заданным шагом.
+
+    :param ds_type: тип датасета (train/val)
+    :param output_path: путь для сохранения объединенного датасета
+    :param dataset_paths: пути к исходным датасетам
+    :param annotation_step: шаг выборки аннотаций (например, 5 — каждая пятая)
+    :param max_prev_imgs: максимальное количество предыдущих кадров в prev_imgs
+    """
 
     merged = {
         'info': {},
@@ -78,7 +88,6 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max
         # Обработка изображений
         current_images = []
         for img in ds.get('images', []):
-            # Проверка дубликатов
             if img['file_name'] in existing_files:
                 print(f"Предупреждение: Дубликат файла {img['file_name']}")
                 continue
@@ -97,9 +106,20 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max
 
         merged['images'].extend(current_images)
 
-        # Обработка аннотаций
+        # Обработка аннотаций (с шагом)
         current_anns = []
-        for ann in ds.get('annotations', []):
+        skipped_anns = 0
+        for idx, ann in enumerate(ds.get('annotations', [])):
+            # Пропускаем аннотации, не попадающие под шаг
+            if idx % annotation_step != 0:
+                skipped_anns += 1
+                continue
+
+            # Проверяем, что изображение уже добавлено
+            if ann['image_id'] not in image_id_map:
+                print(f"[Предупреждение] Аннотация {ann['id']} ссылается на неизвестное изображение")
+                continue
+
             new_ann = {
                 'id': next_ann_id,
                 'image_id': image_id_map[ann['image_id']],
@@ -118,6 +138,7 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max
             next_ann_id += 1
 
         merged['annotations'].extend(current_anns)
+        print(f"[INFO] Из датасета {ds_path} добавлено {len(current_anns)} аннотаций, пропущено {skipped_anns}")
 
         # Копирование изображений
         img_dir = Path(ds_path) / f"{ds_type}2017"
@@ -125,14 +146,15 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str, max
             copy_folder_contents(str(img_dir), str(Path(output_path) / f"{ds_type}2017"))
 
     # Сохранение результата
-    output_dir = Path(output_path + r"\annotations")
+    output_dir = Path(output_path) / "annotations"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Сохраняем JSON
-    with open(output_dir / f"instances_{ds_type}2017.json", 'w') as f:
+    output_json_path = output_dir / f"instances_{ds_type}2017.json"
+    with open(output_json_path, 'w') as f:
         json.dump(merged, f, indent=2, ensure_ascii=False)
 
-    replace_in_file(output_dir / f"instances_{ds_type}2017.json", '"category_id": 0', '"category_id": 1')
+    replace_in_file(output_json_path, '"category_id": 0', '"category_id": 1')
 
     print(f"Слияние завершено! Результат сохранен в {output_path}")
 
@@ -165,12 +187,28 @@ def replace_in_file(file_path, old_substring, new_substring):
         print(f"[Ошибка] При обработке файла: {e}")
 
 
+my_annotation_step_train = 10
+my_annotation_step_test = 20
+my_max_prev_imgs = 5
+
+if os.path.exists(r"D:\Disser\Datasets\TEST-DATASET"):
+    shutil.rmtree(r"D:\Disser\Datasets\TEST-DATASET")
+
 merge_coco_datasets(
     "train",
     r"D:\Disser\Datasets\TEST-DATASET",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-40",
-    r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-train-41",
-    max_prev_imgs=5
+    r"D:\Disser\Datasets\temps\dataset-train-0",
+    r"D:\Disser\Datasets\temps\dataset-train-1",
+    r"D:\Disser\Datasets\temps\dataset-train-2",
+    r"D:\Disser\Datasets\temps\dataset-train-3",
+    r"D:\Disser\Datasets\temps\dataset-train-4",
+    r"D:\Disser\Datasets\temps\dataset-train-5",
+    r"D:\Disser\Datasets\temps\dataset-train-6",
+    r"D:\Disser\Datasets\temps\dataset-train-7",
+    r"D:\Disser\Datasets\temps\dataset-train-8",
+    r"D:\Disser\Datasets\temps\dataset-train-9",
+    annotation_step=my_annotation_step_train,
+    max_prev_imgs=my_max_prev_imgs
 )
 # merge_coco_datasets(
 #     "train",
@@ -221,21 +259,15 @@ merge_coco_datasets(
 
 pass
 
-# merge_coco_datasets(
-#     "val",
-#     r"D:\Disser\Datasets\TEST-DATASET",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-0",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-1",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-2",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-3",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-4",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-5",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-6",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-7",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-8",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-val-9",
-#     max_prev_imgs=5
-# )
+merge_coco_datasets(
+    "val",
+    r"D:\Disser\Datasets\TEST-DATASET",
+    r"D:\Disser\Datasets\temps\dataset-val-0",
+    r"D:\Disser\Datasets\temps\dataset-val-1",
+    r"D:\Disser\Datasets\temps\dataset-val-2",
+    annotation_step=my_annotation_step_test,
+    max_prev_imgs=5
+)
 
 pass
 
