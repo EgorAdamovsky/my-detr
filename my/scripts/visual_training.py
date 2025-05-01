@@ -76,8 +76,7 @@ def plot_training_progress(log_data):
     axes[2].legend()
     axes[2].grid(True)
 
-    # Дополнительный график для COCOEval BBox (если нужно)
-
+    # Дополнительный график для COCOEval BBox
     COCOEvalBBox = ["AP 0.50:0.95", "AP 0.50", "AP 0.75", "AP 0.50:0.95, area=small", "AP 0.50:0.95, area=medium",
                     "AP 0.50:0.95, area=large", "AR 0.50:0.95, maxDets=1", "AR 0.50:0.95, maxDets=10",
                     "AR 0.50:0.95, maxDets=100", "AR 0.50:0.95, area=small",
@@ -102,7 +101,7 @@ def plot_training_progress(log_data):
 # Пример использования
 if __name__ == "__main__":
     # Логи в виде строки (замените на путь к файлу, если логи находятся в файле)
-    with open(r"D:\Disser\Programs\OTHER-MODELS\my-detr\my\out\log.txt", "r") as file:
+    with open(r"/my/out/log.txt", "r") as file:
         logs = file.read()
 
     # Читаем логи
