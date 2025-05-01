@@ -29,14 +29,9 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
                         annotation_step: int = 1, max_prev_imgs: int = 10):
     """
     Сливает несколько COCO-датасетов в один, выбирая аннотации с заданным шагом.
-
-    :param ds_type: тип датасета (train/val)
-    :param output_path: путь для сохранения объединенного датасета
-    :param dataset_paths: пути к исходным датасетам
-    :param annotation_step: шаг выборки аннотаций (например, 5 — каждая пятая)
-    :param max_prev_imgs: максимальное количество предыдущих кадров в prev_imgs
+    Все изображения копируются в выходную папку, но в JSON добавляются только те,
+    у которых есть аннотации после фильтрации.
     """
-
     merged = {
         'info': {},
         'licenses': [],
@@ -54,14 +49,21 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
     next_image_id = 0
     next_ann_id = 0
 
-    # Обрабатываем все датасеты
+    # 1. Сначала копируем все изображения из всех датасетов в выходную папку
+    output_img_dir = Path(output_path) / f"{ds_type}2017"
+    for ds_path in dataset_paths:
+        img_dir = Path(ds_path) / f"{ds_type}2017"
+        if img_dir.exists():
+            copy_folder_contents(str(img_dir), str(output_img_dir))
+
+    # 2. Обработка всех датасетов
     for ds_idx, ds_path in enumerate(dataset_paths):
         # Загружаем JSON
         json_path = Path(ds_path) / "annotations" / f"instances_{ds_type}2017.json"
         with open(json_path, 'r') as f:
             ds = json.load(f)
 
-        # Обработка категорий
+        # 2.1 Обработка категорий
         for cat in ds.get('categories', []):
             key = (cat['name'], cat.get('supercategory', ''))
             if key not in category_map:
@@ -73,7 +75,7 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
                 })
                 next_cat_id += 1
 
-        # Обработка лицензий (уникальные)
+        # 2.2 Обработка лицензий
         existing_licenses = {(lic['id'], lic['name']) for lic in merged['licenses']}
         for lic in ds.get('licenses', []):
             key = (lic['id'], lic['name'])
@@ -81,14 +83,30 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
                 merged['licenses'].append(lic)
                 existing_licenses.add(key)
 
-        # Обработка info (берем из первого непустого)
+        # 2.3 Обработка info
         if not merged['info'] and ds.get('info'):
             merged['info'] = ds['info']
 
-        # Обработка изображений
+        # 3. Обработка аннотаций с шагом
+        filtered_anns = []
+        skipped_anns = 0
+        for idx, ann in enumerate(ds.get('annotations', [])):
+            if idx % annotation_step != 0:
+                skipped_anns += 1
+            else:
+                filtered_anns.append(ann)
+
+        # 4. Сборка ID изображений с нужными аннотациями
+        relevant_image_ids = {ann['image_id'] for ann in filtered_anns}
+
+        # 5. Обработка изображений (только те, что в relevant_image_ids)
         current_images = []
+        added_files = set()  # для проверки дубликатов в текущем датасете
         for img in ds.get('images', []):
-            if img['file_name'] in existing_files:
+            if img['id'] not in relevant_image_ids:
+                continue  # пропускаем изображение без аннотаций
+
+            if img['file_name'] in existing_files or img['file_name'] in added_files:
                 print(f"Предупреждение: Дубликат файла {img['file_name']}")
                 continue
 
@@ -97,37 +115,45 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
                 'file_name': img['file_name'],
                 'width': img['width'],
                 'height': img['height'],
-                'prev_imgs': img.get('prev_imgs', [])[-max_prev_imgs:]  # Ограничение до 10
+                'prev_imgs': img.get('prev_imgs', [])[-max_prev_imgs:]
             }
             current_images.append(new_img)
             image_id_map[img['id']] = next_image_id
             existing_files.add(img['file_name'])
+            added_files.add(img['file_name'])
             next_image_id += 1
 
         merged['images'].extend(current_images)
+        print(f"[INFO] Из датасета {ds_path} добавлено {len(current_images)} изображений")
 
-        # Обработка аннотаций (с шагом)
+        # 6. Обработка аннотаций
         current_anns = []
-        skipped_anns = 0
-        for idx, ann in enumerate(ds.get('annotations', [])):
-            # Пропускаем аннотации, не попадающие под шаг
-            if idx % annotation_step != 0:
-                skipped_anns += 1
-                continue
-
+        for ann in filtered_anns:
             # Проверяем, что изображение уже добавлено
             if ann['image_id'] not in image_id_map:
                 print(f"[Предупреждение] Аннотация {ann['id']} ссылается на неизвестное изображение")
                 continue
 
+            # Получаем информацию о категории из исходного датасета
+            original_category = None
+            for cat in ds.get('categories', []):
+                if cat['id'] == ann['category_id']:
+                    original_category = cat
+                    break
+            if not original_category:
+                print(f"[Ошибка] Категория ID {ann['category_id']} не найдена для аннотации {ann['id']}")
+                continue
+
+            key = (original_category['name'], original_category.get('supercategory', ''))
+            mapped_cat_id = category_map.get(key, 0)
+            if mapped_cat_id == 0:
+                print(f"[Ошибка] Категория {key} не найдена в category_map")
+                continue
+
             new_ann = {
                 'id': next_ann_id,
                 'image_id': image_id_map[ann['image_id']],
-                'category_id': category_map.get(
-                    (ds['categories'][ann['category_id'] - 1]['name'],
-                     ds['categories'][ann['category_id'] - 1].get('supercategory', '')),
-                    0
-                ),
+                'category_id': mapped_cat_id,
                 'bbox': ann['bbox'],
                 'area': ann['area'],
                 'segmentation': ann.get('segmentation', []),
@@ -140,12 +166,7 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
         merged['annotations'].extend(current_anns)
         print(f"[INFO] Из датасета {ds_path} добавлено {len(current_anns)} аннотаций, пропущено {skipped_anns}")
 
-        # Копирование изображений
-        img_dir = Path(ds_path) / f"{ds_type}2017"
-        if img_dir.exists():
-            copy_folder_contents(str(img_dir), str(Path(output_path) / f"{ds_type}2017"))
-
-    # Сохранение результата
+    # 7. Сохранение результата
     output_dir = Path(output_path) / "annotations"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -153,8 +174,6 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
     output_json_path = output_dir / f"instances_{ds_type}2017.json"
     with open(output_json_path, 'w') as f:
         json.dump(merged, f, indent=2, ensure_ascii=False)
-
-    replace_in_file(output_json_path, '"category_id": 0', '"category_id": 1')
 
     print(f"Слияние завершено! Результат сохранен в {output_path}")
 
@@ -187,16 +206,16 @@ def replace_in_file(file_path, old_substring, new_substring):
         print(f"[Ошибка] При обработке файла: {e}")
 
 
-my_annotation_step_train = 10
-my_annotation_step_test = 20
+my_annotation_step_train = 25
+my_annotation_step_test = 75
 my_max_prev_imgs = 5
 
-if os.path.exists(r"D:\Disser\Datasets\TEST-DATASET"):
-    shutil.rmtree(r"D:\Disser\Datasets\TEST-DATASET")
+if os.path.exists(r"D:\Disser\Datasets\TEST-DATASET1"):
+    shutil.rmtree(r"D:\Disser\Datasets\TEST-DATASET1")
 
 merge_coco_datasets(
     "train",
-    r"D:\Disser\Datasets\TEST-DATASET",
+    r"D:\Disser\Datasets\TEST-DATASET1",
     r"D:\Disser\Datasets\temps\dataset-train-0",
     r"D:\Disser\Datasets\temps\dataset-train-1",
     r"D:\Disser\Datasets\temps\dataset-train-2",
@@ -207,6 +226,20 @@ merge_coco_datasets(
     r"D:\Disser\Datasets\temps\dataset-train-7",
     r"D:\Disser\Datasets\temps\dataset-train-8",
     r"D:\Disser\Datasets\temps\dataset-train-9",
+    r"D:\Disser\Datasets\temps\dataset-train-10",
+    r"D:\Disser\Datasets\temps\dataset-train-11",
+    r"D:\Disser\Datasets\temps\dataset-train-12",
+    r"D:\Disser\Datasets\temps\dataset-train-13",
+    r"D:\Disser\Datasets\temps\dataset-train-14",
+    r"D:\Disser\Datasets\temps\dataset-train-15",
+    r"D:\Disser\Datasets\temps\dataset-train-16",
+    r"D:\Disser\Datasets\temps\dataset-train-17",
+    r"D:\Disser\Datasets\temps\dataset-train-18",
+    r"D:\Disser\Datasets\temps\dataset-train-19",
+    r"D:\Disser\Datasets\temps\dataset-train-20",
+    r"D:\Disser\Datasets\temps\dataset-train-21",
+    r"D:\Disser\Datasets\temps\dataset-train-22",
+    r"D:\Disser\Datasets\temps\dataset-train-23",
     annotation_step=my_annotation_step_train,
     max_prev_imgs=my_max_prev_imgs
 )
@@ -261,12 +294,13 @@ pass
 
 merge_coco_datasets(
     "val",
-    r"D:\Disser\Datasets\TEST-DATASET",
+    r"D:\Disser\Datasets\TEST-DATASET1",
     r"D:\Disser\Datasets\temps\dataset-val-0",
     r"D:\Disser\Datasets\temps\dataset-val-1",
     r"D:\Disser\Datasets\temps\dataset-val-2",
+    r"D:\Disser\Datasets\temps\dataset-val-3",
     annotation_step=my_annotation_step_test,
-    max_prev_imgs=5
+    max_prev_imgs=my_max_prev_imgs
 )
 
 pass

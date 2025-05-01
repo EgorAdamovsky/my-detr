@@ -9,8 +9,8 @@ import cv2
 import numpy as np
 from pycocotools.coco import COCO
 
-PATH = r"D:\Disser\Datasets\TEST-DATASET"
-# PATH = r"D:\Disser\Datasets\temps\dataset-train-9"
+PATH = r"D:\Disser\Datasets\TEST-DATASET1"
+# PATH = r"D:\Disser\Datasets\temps\dataset-train-21"
 # PATH = r"D:\Disser\Datasets\temps\dataset-val-2"
 
 DATASET_CONFIG = {
@@ -29,8 +29,6 @@ COLORS = [(0, 255, 0), (0, 0, 255), (255, 0, 0)]
 
 
 def visualize_annotations(data_type):
-    if os.path.exists(PATH + r'\visualization'):
-        shutil.rmtree(PATH + r'\visualization')
 
     config = DATASET_CONFIG[data_type]
 
@@ -67,6 +65,10 @@ def visualize_annotations(data_type):
         ann_ids = coco.getAnnIds(imgIds=img_id)
         annotations = coco.loadAnns(ann_ids)
 
+        # Пропуск изображения без аннотаций
+        if not annotations:
+            continue
+
         # Визуализация аннотаций
         for ann in annotations:
             category = coco.loadCats(ann['category_id'])[0]['name']
@@ -94,6 +96,8 @@ def visualize_annotations(data_type):
 
 
 if __name__ == "__main__":
+    if os.path.exists(PATH + r'\visualizations'):
+        shutil.rmtree(PATH + r'\visualizations')
     for data_type in DATASET_CONFIG:
         print(f"\n[Обработка] Начата визуализация для: {data_type.upper()}")
         visualize_annotations(data_type)
