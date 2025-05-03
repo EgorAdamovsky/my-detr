@@ -9,8 +9,8 @@ import cv2
 import numpy as np
 from pycocotools.coco import COCO
 
-PATH = r"D:\Disser\Datasets\TEST-DATASET1"
-# PATH = r"D:\Disser\Datasets\temps\dataset-train-21"
+PATH = r"D:\Disser\Datasets\TEST-DATASET"
+# PATH = r"D:\Disser\Datasets\temps\dataset-train-25"
 # PATH = r"D:\Disser\Datasets\temps\dataset-val-2"
 
 DATASET_CONFIG = {
