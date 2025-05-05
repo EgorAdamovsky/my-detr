@@ -87,17 +87,15 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
         if not merged['info'] and ds.get('info'):
             merged['info'] = ds['info']
 
-        # 3. Обработка аннотаций с шагом
-        filtered_anns = []
-        skipped_anns = 0
+        # 3. Сборка ID изображений, прошедших фильтр по шагу
+        relevant_image_ids = set()
         for idx, ann in enumerate(ds.get('annotations', [])):
-            if idx % annotation_step != 0:
-                skipped_anns += 1
-            else:
-                filtered_anns.append(ann)
+            if idx % annotation_step == 0:  # Шаг по индексу аннотации
+                relevant_image_ids.add(ann['image_id'])
 
-        # 4. Сборка ID изображений с нужными аннотациями
-        relevant_image_ids = {ann['image_id'] for ann in filtered_anns}
+        # 4. Формирование списка всех аннотаций для выбранных изображений
+        filtered_anns = [ann for ann in ds.get('annotations', [])
+                         if ann['image_id'] in relevant_image_ids]
 
         # 5. Обработка изображений (только те, что в relevant_image_ids)
         current_images = []
@@ -164,7 +162,7 @@ def merge_coco_datasets(ds_type: str, output_path: str, *dataset_paths: str,
             next_ann_id += 1
 
         merged['annotations'].extend(current_anns)
-        print(f"[INFO] Из датасета {ds_path} добавлено {len(current_anns)} аннотаций, пропущено {skipped_anns}")
+        print(f"[INFO] Из датасета {ds_path} добавлено {len(current_anns)} аннотаций")
 
     # 7. Сохранение результата
     output_dir = Path(output_path) / "annotations"
@@ -206,10 +204,10 @@ def replace_in_file(file_path, old_substring, new_substring):
         print(f"[Ошибка] При обработке файла: {e}")
 
 
-my_annotation_step_train = 25
-my_annotation_step_test = 75
+my_annotation_step_train = 15
+my_annotation_step_test = 50
 my_max_prev_imgs = 5
-my_path = r"D:\Disser\Datasets\TEST-DATASET"
+my_path = r"D:\Disser\Datasets\TEST-DATASET1"
 
 if os.path.exists(my_path):
     shutil.rmtree(my_path)
@@ -217,32 +215,106 @@ if os.path.exists(my_path):
 merge_coco_datasets(
     "train",
     my_path,
-    # r"D:\Disser\Datasets\temps\dataset-train-0",
-    # r"D:\Disser\Datasets\temps\dataset-train-1",
-    # r"D:\Disser\Datasets\temps\dataset-train-2",
-    # r"D:\Disser\Datasets\temps\dataset-train-3",
-    # r"D:\Disser\Datasets\temps\dataset-train-4",
-    # r"D:\Disser\Datasets\temps\dataset-train-5",
-    # r"D:\Disser\Datasets\temps\dataset-train-6",
-    # r"D:\Disser\Datasets\temps\dataset-train-7",
-    # r"D:\Disser\Datasets\temps\dataset-train-8",
-    # r"D:\Disser\Datasets\temps\dataset-train-9",
-    # r"D:\Disser\Datasets\temps\dataset-train-10",
-    # r"D:\Disser\Datasets\temps\dataset-train-11",
-    # r"D:\Disser\Datasets\temps\dataset-train-12",
-    # r"D:\Disser\Datasets\temps\dataset-train-13",
-    # r"D:\Disser\Datasets\temps\dataset-train-14",
-    # r"D:\Disser\Datasets\temps\dataset-train-15",
-    # r"D:\Disser\Datasets\temps\dataset-train-16",
-    # r"D:\Disser\Datasets\temps\dataset-train-17",
-    # r"D:\Disser\Datasets\temps\dataset-train-18",
-    # r"D:\Disser\Datasets\temps\dataset-train-19",
+    r"D:\Disser\Datasets\temps\dataset-train-1",
+    r"D:\Disser\Datasets\temps\dataset-train-2",
+    r"D:\Disser\Datasets\temps\dataset-train-3",
+    r"D:\Disser\Datasets\temps\dataset-train-4",
+    r"D:\Disser\Datasets\temps\dataset-train-5",
+    r"D:\Disser\Datasets\temps\dataset-train-6",
+    r"D:\Disser\Datasets\temps\dataset-train-7",
+    r"D:\Disser\Datasets\temps\dataset-train-8",
+    r"D:\Disser\Datasets\temps\dataset-train-9",
+    r"D:\Disser\Datasets\temps\dataset-train-10",
+    r"D:\Disser\Datasets\temps\dataset-train-11",
+    r"D:\Disser\Datasets\temps\dataset-train-12",
+    r"D:\Disser\Datasets\temps\dataset-train-13",
+    r"D:\Disser\Datasets\temps\dataset-train-14",
+    r"D:\Disser\Datasets\temps\dataset-train-15",
+    r"D:\Disser\Datasets\temps\dataset-train-16",
+    r"D:\Disser\Datasets\temps\dataset-train-17",
+    r"D:\Disser\Datasets\temps\dataset-train-18",
+    r"D:\Disser\Datasets\temps\dataset-train-19",
     r"D:\Disser\Datasets\temps\dataset-train-20",
     r"D:\Disser\Datasets\temps\dataset-train-21",
     r"D:\Disser\Datasets\temps\dataset-train-22",
     r"D:\Disser\Datasets\temps\dataset-train-23",
     r"D:\Disser\Datasets\temps\dataset-train-24",
     r"D:\Disser\Datasets\temps\dataset-train-25",
+    r"D:\Disser\Datasets\temps\dataset-train-26",
+    r"D:\Disser\Datasets\temps\dataset-train-27",
+    r"D:\Disser\Datasets\temps\dataset-train-28",
+    r"D:\Disser\Datasets\temps\dataset-train-29",
+    r"D:\Disser\Datasets\temps\dataset-train-30",
+    r"D:\Disser\Datasets\temps\dataset-train-31",
+    r"D:\Disser\Datasets\temps\dataset-train-32",
+    r"D:\Disser\Datasets\temps\dataset-train-33",
+    r"D:\Disser\Datasets\temps\dataset-train-34",
+    r"D:\Disser\Datasets\temps\dataset-train-35",
+    r"D:\Disser\Datasets\temps\dataset-train-36",
+    r"D:\Disser\Datasets\temps\dataset-train-37",
+    r"D:\Disser\Datasets\temps\dataset-train-38",
+    r"D:\Disser\Datasets\temps\dataset-train-39",
+    r"D:\Disser\Datasets\temps\dataset-train-40",
+    r"D:\Disser\Datasets\temps\dataset-train-41",
+    r"D:\Disser\Datasets\temps\dataset-train-42",
+    r"D:\Disser\Datasets\temps\dataset-train-43",
+    r"D:\Disser\Datasets\temps\dataset-train-44",
+    r"D:\Disser\Datasets\temps\dataset-train-45",
+    r"D:\Disser\Datasets\temps\dataset-train-46",
+    r"D:\Disser\Datasets\temps\dataset-train-47",
+    r"D:\Disser\Datasets\temps\dataset-train-48",
+    r"D:\Disser\Datasets\temps\dataset-train-49",
+    r"D:\Disser\Datasets\temps\dataset-train-50",
+    r"D:\Disser\Datasets\temps\dataset-train-51",
+    r"D:\Disser\Datasets\temps\dataset-train-52",
+    r"D:\Disser\Datasets\temps\dataset-train-53",
+    r"D:\Disser\Datasets\temps\dataset-train-54",
+    r"D:\Disser\Datasets\temps\dataset-train-55",
+    r"D:\Disser\Datasets\temps\dataset-train-56",
+    r"D:\Disser\Datasets\temps\dataset-train-57",
+    r"D:\Disser\Datasets\temps\dataset-train-58",
+    r"D:\Disser\Datasets\temps\dataset-train-59",
+    r"D:\Disser\Datasets\temps\dataset-train-60",
+    r"D:\Disser\Datasets\temps\dataset-train-61",
+    r"D:\Disser\Datasets\temps\dataset-train-62",
+    r"D:\Disser\Datasets\temps\dataset-train-63",
+    r"D:\Disser\Datasets\temps\dataset-train-64",
+    r"D:\Disser\Datasets\temps\dataset-train-65",
+    r"D:\Disser\Datasets\temps\dataset-train-66",
+    r"D:\Disser\Datasets\temps\dataset-train-67",
+    r"D:\Disser\Datasets\temps\dataset-train-68",
+    r"D:\Disser\Datasets\temps\dataset-train-69",
+    r"D:\Disser\Datasets\temps\dataset-train-70",
+    r"D:\Disser\Datasets\temps\dataset-train-71",
+    r"D:\Disser\Datasets\temps\dataset-train-72",
+    r"D:\Disser\Datasets\temps\dataset-train-73",
+    r"D:\Disser\Datasets\temps\dataset-train-74",
+    r"D:\Disser\Datasets\temps\dataset-train-75",
+    r"D:\Disser\Datasets\temps\dataset-train-76",
+    r"D:\Disser\Datasets\temps\dataset-train-77",
+    r"D:\Disser\Datasets\temps\dataset-train-78",
+    r"D:\Disser\Datasets\temps\dataset-train-79",
+    r"D:\Disser\Datasets\temps\dataset-train-80",
+    r"D:\Disser\Datasets\temps\dataset-train-81",
+    r"D:\Disser\Datasets\temps\dataset-train-82",
+    r"D:\Disser\Datasets\temps\dataset-train-83",
+    r"D:\Disser\Datasets\temps\dataset-train-84",
+    r"D:\Disser\Datasets\temps\dataset-train-85",
+    r"D:\Disser\Datasets\temps\dataset-train-86",
+    r"D:\Disser\Datasets\temps\dataset-train-87",
+    r"D:\Disser\Datasets\temps\dataset-train-88",
+    r"D:\Disser\Datasets\temps\dataset-train-89",
+    r"D:\Disser\Datasets\temps\dataset-train-90",
+    r"D:\Disser\Datasets\temps\dataset-train-91",
+    r"D:\Disser\Datasets\temps\dataset-train-92",
+    r"D:\Disser\Datasets\temps\dataset-train-93",
+    r"D:\Disser\Datasets\temps\dataset-train-94",
+    r"D:\Disser\Datasets\temps\dataset-train-95",
+    r"D:\Disser\Datasets\temps\dataset-train-96",
+    r"D:\Disser\Datasets\temps\dataset-train-97",
+    r"D:\Disser\Datasets\temps\dataset-train-98",
+    r"D:\Disser\Datasets\temps\dataset-train-99",
+    r"D:\Disser\Datasets\temps\dataset-train-100",
     annotation_step=my_annotation_step_train,
     max_prev_imgs=my_max_prev_imgs
 )
@@ -256,20 +328,16 @@ merge_coco_datasets(
     r"D:\Disser\Datasets\temps\dataset-val-1",
     r"D:\Disser\Datasets\temps\dataset-val-2",
     r"D:\Disser\Datasets\temps\dataset-val-3",
+    r"D:\Disser\Datasets\temps\dataset-val-4",
+    r"D:\Disser\Datasets\temps\dataset-val-5",
+    r"D:\Disser\Datasets\temps\dataset-val-6",
+    r"D:\Disser\Datasets\temps\dataset-val-7",
+    r"D:\Disser\Datasets\temps\dataset-val-8",
+    r"D:\Disser\Datasets\temps\dataset-val-9",
     annotation_step=my_annotation_step_test,
     max_prev_imgs=my_max_prev_imgs
 )
 
 pass
-
-# merge_coco_datasets(
-#     "val",
-#     r"D:\Disser\Datasets\TEST-DATASET",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-test-0",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-test-1",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-test-2",
-#     r"D:\Disser\Datasets\TEST-DATASET\temps\dataset-test-3",
-#     max_prev_imgs=10
-# )
 
 print("[Успех]")

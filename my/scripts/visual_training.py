@@ -38,7 +38,7 @@ def plot_training_progress(log_data):
     coco_eval_bbox = [log["test_coco_eval_bbox"] for log in log_data]
 
     # Создаем графики
-    fig, axes = plt.subplots(3, 1, figsize=(10, 18))
+    fig, axes = plt.subplots(2, 1, figsize=(10, 18))
 
     # График потерь (loss)
     g, = axes[0].plot(epochs, train_loss, label="Train Loss", marker='.')
@@ -69,12 +69,12 @@ def plot_training_progress(log_data):
     axes[1].grid(True)
 
     # График learning rate
-    axes[2].plot(epochs, train_lr, label="Learning Rate", marker='o', color='green')
-    axes[2].set_title("Learning Rate over Epochs")
-    axes[2].set_xlabel("Epoch")
-    axes[2].set_ylabel("Learning Rate")
-    axes[2].legend()
-    axes[2].grid(True)
+    # axes[2].plot(epochs, train_lr, label="Learning Rate", marker='o', color='green')
+    # axes[2].set_title("Learning Rate over Epochs")
+    # axes[2].set_xlabel("Epoch")
+    # axes[2].set_ylabel("Learning Rate")
+    # axes[2].legend()
+    # axes[2].grid(True)
 
     # Дополнительный график для COCOEval BBox
     COCOEvalBBox = ["AP 0.50:0.95", "AP 0.50", "AP 0.75", "AP 0.50:0.95, area=small", "AP 0.50:0.95, area=medium",
@@ -101,7 +101,7 @@ def plot_training_progress(log_data):
 # Пример использования
 if __name__ == "__main__":
     # Логи в виде строки (замените на путь к файлу, если логи находятся в файле)
-    with open(r"/my/out/log.txt", "r") as file:
+    with open(r"D:\Disser\Programs\OTHER-MODELS\my-detr\my\out-test\log.txt", "r") as file:
         logs = file.read()
 
     # Читаем логи

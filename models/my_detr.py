@@ -98,7 +98,7 @@ class DETR(nn.Module):
                     color = (255, 0, 0)
                 if max_index == len(out['pred_logits'][0][i]) - 1:
                     color = (0, 255, 0)
-                wth = 2 if max_index == 1 else 1
+                wth = 3 if max_index == 1 else 0
                 if max_index == 1:
                     counter = counter + 1
                 img = cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), color, wth)
