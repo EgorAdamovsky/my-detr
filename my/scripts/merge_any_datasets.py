@@ -204,10 +204,10 @@ def replace_in_file(file_path, old_substring, new_substring):
         print(f"[Ошибка] При обработке файла: {e}")
 
 
-my_annotation_step_train = 15
-my_annotation_step_test = 50
+my_annotation_step_train = 25  # 25, 15, 5
+my_annotation_step_test = 75  # 75, 50, 30
 my_max_prev_imgs = 5
-my_path = r"D:\Disser\Datasets\TEST-DATASET1"
+my_path = r"D:\Disser\Datasets\TEST-DATASET"
 
 if os.path.exists(my_path):
     shutil.rmtree(my_path)
@@ -225,15 +225,12 @@ merge_coco_datasets(
     r"D:\Disser\Datasets\temps\dataset-train-8",
     r"D:\Disser\Datasets\temps\dataset-train-9",
     r"D:\Disser\Datasets\temps\dataset-train-10",
-    r"D:\Disser\Datasets\temps\dataset-train-11",
     r"D:\Disser\Datasets\temps\dataset-train-12",
-    r"D:\Disser\Datasets\temps\dataset-train-13",
     r"D:\Disser\Datasets\temps\dataset-train-14",
     r"D:\Disser\Datasets\temps\dataset-train-15",
     r"D:\Disser\Datasets\temps\dataset-train-16",
     r"D:\Disser\Datasets\temps\dataset-train-17",
     r"D:\Disser\Datasets\temps\dataset-train-18",
-    r"D:\Disser\Datasets\temps\dataset-train-19",
     r"D:\Disser\Datasets\temps\dataset-train-20",
     r"D:\Disser\Datasets\temps\dataset-train-21",
     r"D:\Disser\Datasets\temps\dataset-train-22",
