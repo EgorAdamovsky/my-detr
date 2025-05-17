@@ -59,7 +59,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                                    (target["boxes"][0][2].numpy().astype('int').item(),
                                     target["boxes"][0][3].numpy().astype('int').item()),
                                    (255, 255, 0), 2)
-            cv2.imwrite("my/temps/0_orig.png", img_cv)
+            cv2.imwrite(self.args.output_dir + r"/temps/0_orig.png", img_cv)
 
         if self._transforms is not None:  # Применение дополнительных преобразований
             prevs, target = self._transforms(prevs, target)
@@ -81,12 +81,12 @@ class CocoDetection(torchvision.datasets.CocoDetection):
                         _img = cv2.rectangle(_img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)),
                                              (255, 255, 0), 2)
                         unix_time_int = int(time.time())
-                        plt.imsave('my/images/' + str(i) + "_trans_" + str(unix_time_int) + '.png', _img, format='png')
+                        plt.imsave(self.args.output_dir + r"/temps/" + str(i) + "_trans.png", _img, format='png')
                 except IndexError:
                     pass
 
         return prevs, target
-    ## ЭКСПЕРИМЕНТ #################################################################################################
+        ## ЭКСПЕРИМЕНТ #################################################################################################
 
 
 # Класс для конвертации полигонов COCO в маски
@@ -133,10 +133,12 @@ def make_coco_transforms(image_set, rep):
     if image_set == 'train':
         return T.Compose([
             T.Compose([
-                T.RandomHorizontalFlip(),  # Горизонтальный флип
-                # T.RandomVerticalFlip(),  # вертикальный флип
-                # T.RandomRotate180(),
-                T.RandomShift(shift_x_range=(-0.2, 0.2), shift_y_range=(-0.2, 0.2), fill=0),
+                T.RandomHorizontalFlip(p=0.5),  # горизонтальный флип
+                T.RandomVerticalFlip(p=0.25),  # вертикальный флип
+                T.RandomShift(shift_x_range=(-0.2, 0.2), shift_y_range=(-0.2, 0.2), fill=0),  # смещение
+                T.RandomRotation(degrees=(-30, 30), p=0.75),
+                T.RandomBrightnessContrast(brightness_range=(0.8, 1.2), contrast_range=(0.8, 1.2), p=0.75),  # цвет
+                # T.GridMaskWithBoxProcessing(),
                 T.RandomSelect(  # Выбор между простым ресайзом и ресайзом с кропом
                     T.RandomResize(scales, max_size=1333),
                     T.Compose([
@@ -146,9 +148,6 @@ def make_coco_transforms(image_set, rep):
                     ])
                 ),
             ]),
-            T.RandomHorizontalFlip(),  # Горизонтальный флип
-            # T.RandomVerticalFlip(),  # вертикальный флип
-            T.RandomBrightnessContrast(),
             normalize,
         ])
 
@@ -171,6 +170,7 @@ def build(image_set, args):
         "val": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
     }  # Определение путей для трейна и валидации
     img_folder, ann_file = PATHS[image_set]  # Получение путей для текущего набора данных
-    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set, args.prevs + 1), return_masks=False,
+    dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set, args.prevs + 1),
+                            return_masks=False,
                             args=args)
     return dataset

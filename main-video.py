@@ -2,6 +2,7 @@
 import argparse  # Для обработки аргументов командной строки
 import datetime  # Для работы с датами и временем
 import json  # Для сериализации/десериализации данных
+import os
 import random  # Для генерации случайных чисел
 import time  # Для измерения времени выполнения
 from pathlib import Path  # Для работы с путями файловой системы
@@ -95,6 +96,8 @@ def SetSeed():
 
 def main(args):
     # print(args)  # Вывод переданных аргументов
+    os.makedirs(args.output_dir + r"/images", exist_ok=True)
+    os.makedirs(args.output_dir + r"/temps", exist_ok=True)
     device = torch.device(args.device)  # Инициализация устройства (GPU/CPU)
     SetSeed()  # Установка seed для воспроизводимости (пусть будет)
     model, criterion, postprocessors = build_model(args)  # Создание модели, функции потерь и постпроцессоров

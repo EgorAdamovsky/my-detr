@@ -2,6 +2,7 @@ import random
 import time
 
 import cv2
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -75,35 +76,33 @@ class DETR(nn.Module):
         outputs_coord = self.bbox_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
 
-        # if True:
-        if random.randrange(30) == 0:
-            img = split_samples[0].tensors[0, :, :, :].permute(1, 2, 0).cpu().numpy()
-            arr_min = img.min()
-            arr_max = img.max()
-            img = (img - arr_min) / (arr_max - arr_min)
+        if random.randrange(10) == 0:
+            img_tensor = split_samples[0].tensors[0].permute(1, 2, 0).cpu().numpy()
+            arr_min = img_tensor.min()
+            arr_max = img_tensor.max()
+            img = (img_tensor - arr_min) / (arr_max - arr_min + 1e-8)
+            img = (img * 255).astype(np.uint8)
+            img = np.ascontiguousarray(img)
             s = out["pred_boxes"].size()[1]
-            wh = img.shape
-            plt.imsave('test-output.png', img, format='png')
-            img = cv2.imread('test-output.png')
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            wh = img.shape  # (height, width, channels)
             counter = 0
             for i in range(min(s, 500)):
                 x = int(wh[1] * float(out["pred_boxes"][0, i, 0].cpu().detach().numpy()))
                 y = int(wh[0] * float(out["pred_boxes"][0, i, 1].cpu().detach().numpy()))
                 w = int(wh[1] * float(out["pred_boxes"][0, i, 2].cpu().detach().numpy()))
                 h = int(wh[0] * float(out["pred_boxes"][0, i, 3].cpu().detach().numpy()))
-                max_index = torch.argmax(out['pred_logits'][0][i])
+                max_index = torch.argmax(out['pred_logits'][0][i]).item()
                 color = (128, 128, 128)
                 if max_index == 1:
                     color = (255, 0, 0)
-                if max_index == len(out['pred_logits'][0][i]) - 1:
+                elif max_index == len(out['pred_logits'][0][i]) - 1:
                     color = (0, 255, 0)
-                wth = 3 if max_index == 1 else 0
+                thickness = 2 if max_index == 1 else 1
                 if max_index == 1:
-                    counter = counter + 1
-                img = cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), color, wth)
+                    counter += 1
+                cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), color, thickness)
             unix_time_int = int(time.time())
-            plt.imsave('my/images/' + str(counter) + '_' + str(unix_time_int) + '.png', img, format='png')
+            cv2.imwrite(self.args.output_dir + f'/images/{counter}_{unix_time_int}.png', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
         return out
 

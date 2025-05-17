@@ -3,6 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
+path = r"D:\Disser\Programs\OTHER-MODELS\my-detr\my\out\log.txt"
 
 
 # Функция для чтения логов из файла или строки
@@ -136,8 +137,7 @@ def plot_training_progress(log_data_):
 
 # Пример использования
 if __name__ == "__main__":
-    # Логи в виде строки (замените на путь к файлу, если логи находятся в файле)
-    with open(r"D:\Disser\Programs\OTHER-MODELS\my-detr\my\out\log.txt", "r") as file:
+    with open(path, "r") as file:
         logs = file.read()
 
     # Читаем логи

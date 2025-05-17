@@ -1,3 +1,5 @@
+import math
+
 import PIL
 import torchvision.transforms as T
 import random
@@ -119,6 +121,47 @@ def pad(image: torch.Tensor, target: dict, padding: tuple) -> tuple:
     return padded_image, target
 
 
+def calculate_visibility(boxes, mask):
+    """
+    boxes: [N, 4] в формате (x_min, y_min, x_max, y_max)
+    mask: [H, W] бинарная маска
+    Возвращает: visibility_ratio [N]
+    """
+    visibility_ratios = []
+    for box in boxes:
+        x1, y1, x2, y2 = box.int().tolist()
+        # Вырезаем область бокса из маски
+        box_mask = mask[y1:y2, x1:x2]
+        if box_mask.numel() == 0:
+            visibility = 0.0
+        else:
+            visible_pixels = box_mask.sum().float()
+            total_pixels = (x2 - x1) * (y2 - y1)
+            visibility = (visible_pixels / total_pixels).item()
+        visibility_ratios.append(visibility)
+    return torch.tensor(visibility_ratios)
+
+
+def generate_grid_mask(image_size, d, ratio, rotate_angle):
+    h, w = image_size
+    mask = torch.ones((h, w), dtype=torch.bool)
+
+    # Повернутая сетка
+    if rotate_angle != 0:
+        d = int(d / abs(math.cos(math.radians(rotate_angle))))
+
+    for x in range(0, w, d):
+        for y in range(0, h, d):
+            if random.random() < ratio:
+                yy = min(y + d, h)
+                xx = min(x + d, w)
+                mask[y:yy, x:xx] = 0
+
+    if rotate_angle != 0:
+        mask = F.rotate(mask.unsqueeze(0).float(), rotate_angle).squeeze(0) > 0.5
+    return mask
+
+
 class RandomBrightnessContrast(object):
     def __init__(self,
                  brightness_range: Tuple[float, float] = (0.8, 1.2),
@@ -229,63 +272,130 @@ class RandomShift(object):
         return shifted_image, target
 
 
-class RandomRotate180(object):
-
-    def __init__(self, p=0.125):
+class RandomRotation(object):
+    def __init__(self, degrees=(-10, 10), p=0.5, expand=False):
+        self.degrees = degrees
         self.p = p
+        self.expand = expand
 
     def __call__(self, img: torch.Tensor, target: dict) -> tuple:
-        if random.random() >= self.p:
+        if random.random() > self.p:
             return img, target
 
-        # Получаем размеры изображения
+        angle = random.uniform(*self.degrees)
         _, h, w = img.shape
+        device = img.device
 
-        # Поворачиваем изображение на 180 градусов
-        rotated_img = F.rotate(img, 180, interpolation=InterpolationMode.BILINEAR)
+        # Поворот изображения
+        rotated_img = F.rotate(img, angle, interpolation=InterpolationMode.BILINEAR, expand=self.expand)
 
-        if target is not None:
-            target = target.copy()
+        # Расчет новых размеров
+        if self.expand:
+            new_h, new_w = rotated_img.shape[-2:]
+        else:
+            new_h, new_w = h, w
 
-            # Обработка bounding boxes
-            if "boxes" in target:
-                boxes = target["boxes"].clone()
+        # Центр исходного изображения
+        orig_cx = (w - 1) / 2.0
+        orig_cy = (h - 1) / 2.0
 
-                # Преобразование координат при повороте на 180 градусов
-                boxes[:, [0, 2]] = w - boxes[:, [2, 0]]  # x_min и x_max
-                boxes[:, [1, 3]] = h - boxes[:, [3, 1]]  # y_min и y_max
+        # Центр нового изображения
+        new_cx = (new_w - 1) / 2.0 if self.expand else orig_cx
+        new_cy = (new_h - 1) / 2.0 if self.expand else orig_cy
 
-                # Проверка корректности координат
-                boxes[:, 0::2] = boxes[:, 0::2].clamp(min=0, max=w)
-                boxes[:, 1::2] = boxes[:, 1::2].clamp(min=0, max=h)
+        # Матрица преобразования
+        theta = torch.deg2rad(torch.tensor(angle, device=device))
+        cos_theta = torch.cos(theta)
+        sin_theta = torch.sin(theta)
 
-                # Убедимся, что x_max >= x_min и y_max >= y_min
-                boxes[:, 2] = torch.max(boxes[:, 0], boxes[:, 2])
-                boxes[:, 3] = torch.max(boxes[:, 1], boxes[:, 3])
+        reverse_matrix = torch.tensor([
+            [cos_theta, sin_theta, orig_cx - new_cx * cos_theta - new_cy * sin_theta],
+            [-sin_theta, cos_theta, orig_cy + new_cx * sin_theta - new_cy * cos_theta]
+        ], device=device)
 
-                # Вычисление новой площади
-                area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
-                keep = area > 1e-6  # Фильтрация боксов с нулевой площадью
+        if "boxes" in target:
+            boxes = target["boxes"].clone()
+            num_boxes = boxes.shape[0]
 
-                # Обновление target
-                target["boxes"] = boxes[keep]
-                target["area"] = area[keep]
+            # Генерация углов боксов
+            corners = torch.zeros((num_boxes, 4, 2), device=device)
+            corners[:, 0, :] = boxes[:, [0, 1]]  # Левый верхний
+            corners[:, 1, :] = boxes[:, [2, 1]]  # Правый верхний
+            corners[:, 2, :] = boxes[:, [2, 3]]  # Правый нижний
+            corners[:, 3, :] = boxes[:, [0, 3]]  # Левый нижний
 
-                # Фильтрация других полей
-                for field in ["labels", "iscrowd"]:
-                    if field in target:
-                        target[field] = target[field][keep]
+            # Добавление однородных координат
+            ones = torch.ones((num_boxes, 4, 1), device=device)
+            corners_homo = torch.cat([corners, ones], dim=-1)  # [N,4,3]
 
-            # Обработка масок
-            if "masks" in target:
-                rotated_masks = F.rotate(target["masks"].float(), 180, interpolation=InterpolationMode.NEAREST)
-                target["masks"] = rotated_masks.bool()
+            # Исправленная операция einsum
+            transformed = torch.einsum('ab,ncb->nca', reverse_matrix, corners_homo)
 
-                # Синхронизация масок с боксами
-                if "boxes" in target:
-                    target["masks"] = target["masks"][keep]
+            # Обрезка координат
+            transformed[:, :, 0] = transformed[:, :, 0].clamp(min=0, max=new_w - 1)
+            transformed[:, :, 1] = transformed[:, :, 1].clamp(min=0, max=new_h - 1)
+
+            # Расчет новых боксов
+            x_min, _ = transformed[:, :, 0].min(dim=1)
+            y_min, _ = transformed[:, :, 1].min(dim=1)
+            x_max, _ = transformed[:, :, 0].max(dim=1)
+            y_max, _ = transformed[:, :, 1].max(dim=1)
+
+            new_boxes = torch.stack([x_min, y_min, x_max, y_max], dim=1)
+
+            # Фильтрация невалидных боксов
+            valid = (new_boxes[:, 2] > new_boxes[:, 0] + 1) & (new_boxes[:, 3] > new_boxes[:, 1] + 1)
+
+            # Обновление целевых данных
+            target["boxes"] = new_boxes[valid]
+            for key in ["labels", "area", "iscrowd"]:
+                if key in target:
+                    target[key] = target[key][valid]
+
+            if "area" in target:
+                target["area"] = (new_boxes[valid, 2] - new_boxes[valid, 0]) * (
+                            new_boxes[valid, 3] - new_boxes[valid, 1])
 
         return rotated_img, target
+
+
+class GridMaskWithBoxProcessing:
+    def __init__(self, ratio=0.5, d_range=(0.3, 0.6), rotate=(-45, 45),
+                 visibility_threshold=0.2, p=0.5):
+        self.ratio = ratio
+        self.d_range = d_range
+        self.rotate = rotate
+        self.visibility_threshold = visibility_threshold
+        self.p = p
+
+    def __call__(self, img, target):
+        if random.random() > self.p:
+            return img, target
+
+        # Генерация параметров маски
+        d = random.uniform(*self.d_range) * min(img.shape[1], img.shape[2])
+        angle = random.uniform(*self.rotate)
+        mask = generate_grid_mask(img.shape[1:], d, self.ratio, angle)
+
+        # Применение маски к изображению
+        masked_img = img.clone()
+        masked_img[:, ~mask] = 0  # Зануляем замаскированные пиксели
+
+        # Обработка боксов
+        if "boxes" in target:
+            visibility = calculate_visibility(target["boxes"], mask)
+            keep_indices = visibility > self.visibility_threshold
+
+            # Обновляем target
+            target["boxes"] = target["boxes"][keep_indices]
+            target["labels"] = target["labels"][keep_indices]
+            target["area"] = target["area"][keep_indices]
+
+            # Опционально: обновляем маски (для сегментации)
+            if "masks" in target:
+                target["masks"] = target["masks"][keep_indices]
+
+        return masked_img, target
 
 
 # В классе RandomSizeCrop:
