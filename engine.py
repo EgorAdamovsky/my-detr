@@ -6,10 +6,13 @@ import math
 import os
 import sys
 from typing import Iterable
+
+import cv2
 import torch
 from matplotlib import pyplot as plt
 import util.misc as utils
 from datasets.coco_eval import CocoEvaluator
+from torchvision.transforms import functional as F
 
 
 # ТРЕНИРОВКА 1 ЭПОХА
@@ -135,3 +138,92 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         stats['PQ_th'] = panoptic_res["Things"]
         stats['PQ_st'] = panoptic_res["Stuff"]
     return stats, coco_evaluator
+
+
+def video_to_frames(video_path):
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frames = []
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame)
+    cap.release()
+    return frames, fps
+
+
+def prepare_image(image):
+    image = F.to_tensor(image).type('torch.FloatTensor')  # Converts to [0,1], (H,W,C) -> (C,H,W)
+    image = F.normalize(image, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ImageNet norm
+    image = image.unsqueeze(0)  # Добавляем batch dim: [1, C, H, W]
+    return image
+
+
+def save_frames_to_video(frames, output_path, fps=30, frame_size=None):
+    """
+    Сохраняет список кадров в видеофайл.
+
+    :param frames: Список кадров (np.ndarray), RGB или BGR.
+    :param output_path: Путь для сохранения выходного видео.
+    :param fps: Частота кадров.
+    :param frame_size: Размер кадра (ширина, высота). Если None, берётся размер первого кадра.
+    """
+    if frames and len(frames[0].shape) == 3 and frames[0].shape[2] == 3:
+        converted_frames = [cv2.cvtColor(f, cv2.COLOR_RGB2BGR) for f in frames]
+    else:
+        converted_frames = frames  # если уже в BGR
+    if not converted_frames:
+        raise ValueError("Список кадров пустой.")
+    height, width = converted_frames[0].shape[:2]
+    if frame_size:
+        width, height = frame_size
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # кодек для .mp4
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    for frame in converted_frames:
+        out.write(frame)
+    out.release()
+    print(f"Видео успешно сохранено: {output_path}")
+
+
+@torch.no_grad()
+def evaluate_video(model, criterion, postprocessors, data_loader, base_ds, device, args):
+    model.eval()
+    criterion.eval()
+    frames, fps = video_to_frames(args.path_video)
+    for f in range(len(frames)):
+        if f >= args.prevs:
+            samples = prepare_image(frames[f])
+            for p in range(args.prevs):
+                samples = torch.cat([samples, prepare_image(frames[f - p])], dim=1, out=None)
+            samples = samples.to(device)
+            out = model(samples)
+            pass
+            img = frames[f]
+            s = out["pred_boxes"].size()[1]
+            wh = img.shape
+            counter = 0
+            for i in range(min(s, 500)):
+                x = int(wh[1] * float(out["pred_boxes"][0, i, 0].cpu().detach().numpy()))
+                y = int(wh[0] * float(out["pred_boxes"][0, i, 1].cpu().detach().numpy()))
+                w = int(wh[1] * float(out["pred_boxes"][0, i, 2].cpu().detach().numpy()))
+                h = int(wh[0] * float(out["pred_boxes"][0, i, 3].cpu().detach().numpy()))
+                max_index = torch.argmax(out['pred_logits'][0][i]).item()
+                color = (128, 128, 128)
+                if max_index == 1:
+                    color = (255, 0, 0)
+                elif max_index == len(out['pred_logits'][0][i]) - 1:
+                    color = (0, 255, 0)
+                thickness = 2 if max_index == 1 else 1
+                if max_index == 1:
+                    counter += 1
+                cv2.rectangle(img, (int(x - w / 2), int(y - h / 2)), (int(x + w / 2), int(y + h / 2)), color, thickness)
+            if args.path_video_out != "":
+                frames[f] = img
+            else:
+                cv2.imshow("FRAME", img)
+                cv2.waitKey(1)
+            print("Кадр: " + str(f))
+    if args.path_video_out != "":
+        save_frames_to_video(frames, args.output_dir + "\\" + args.path_video_out, fps=int(fps))

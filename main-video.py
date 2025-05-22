@@ -11,7 +11,7 @@ import torch  # Основная библиотека для глубокого 
 from torch.utils.data import DataLoader  # Для загрузки данных в batches
 import util.misc as utils  # Вспомогательные функции из модуля util
 from datasets import build_dataset, get_coco_api_from_dataset  # Функции для работы с датасетами
-from engine import evaluate, train_one_epoch  # Функции для обучения и оценки модели
+from engine import evaluate, train_one_epoch, evaluate_video  # Функции для обучения и оценки модели
 from models import build_model  # Функция для построения модели DETR
 import matplotlib  # Библиотека для визуализации
 from matplotlib import pyplot as plt  # Модуль для построения графиков
@@ -28,6 +28,9 @@ def get_args_parser():
     ## ЭКСПЕРИМЕНТ #####################################################################################################
     parser.add_argument('--prevs', default=2, type=int, help='Количество предыдущих кадров')
     parser.add_argument('--show', default=1, type=int, help='Генерировать ли отладочные картинки')
+    parser.add_argument('--eval_video', default=0, type=int, help='Проверяем ли видео?')
+    parser.add_argument('--path_video', default="", type=str, help='Путь к видеофайлу для проверки')
+    parser.add_argument('--path_video_out', default="", type=str, help='Куда сохранять файл, если нужно...')
     ## ЭКСПЕРИМЕНТ #####################################################################################################
 
     # Параметры оптимизатора
@@ -145,6 +148,11 @@ def main(args):
                                               args.output_dir)
         if args.output_dir:
             utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+        return
+
+    # Режим оценки на видео
+    if args.eval_video:
+        evaluate_video(model, criterion, postprocessors, data_loader_val, base_ds, device, args)
         return
 
     ####################################################################################################################
